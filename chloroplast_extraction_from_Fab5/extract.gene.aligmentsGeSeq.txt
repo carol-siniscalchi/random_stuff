@@ -1,0 +1,47 @@
+# After you run GeSeq, you should have a folder with several outputs. In the CDS file, you'll have one file per species, which will be a multifasta with all the genes recovered for each species. The first step is pulling the sequences belonging to each gene to make gene-specific files. 
+
+# You'll need to run this loop for each chloroplast gene (~75), changing the gene name after the "grep" part of the command and the output file.
+
+for file in *.fasta;
+do
+cat "$file" | awk '/^>/ {printf("\n%s\n",$0);next; } {printf("%s",$0);} END {printf("\n");}' | grep -A 1 ndhF >> Fab5_ndhF.fasta
+done
+
+# After that, move all the gene files to a different folder and run mafft to align them.
+
+for file in *.fasta
+do
+mafft --auto $file > $file.aligned
+done
+
+# Then you'll need to convert the file to phylip. You can use whatever conversor you want, this is using phyx:
+
+for file in *.aligned
+do
+pxs2phy -s $file -o $file.phy
+done
+
+# The next step is to remove the incomplete fragments identified by GeSeq and included in the gene files. Their headers are identified with a "_fragment" bit in the header. This loop will create a file with the ending ".bak" with the original content and the file itself will be modified.
+
+for file in *.phy
+do
+sed -i.bak '/fragment_/d' $file
+done
+
+Then run the following loop to clean the headers:
+
+for file in *.phy
+do
+sed -e 's/-blatX//g' $file > $file.clean
+done
+
+# Now you'll need to clean the gene names from the headers, otherwise you'll have trouble when running astral, for example. We'll use a sed script that I'm sending attached.
+
+for file in *.clean
+do
+sed -f chloroplast.gene.remover.sh $file > $file.nogene
+done
+
+# Then one last loop to clean the file names and make them a bit more sane:
+for filename in ./*; do mv "./$filename" "./$(echo "$filename" | sed -e 's/.fasta.aligned.phy.clean.nogene/.final.phy/g')";  done
+
